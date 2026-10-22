@@ -14,7 +14,9 @@ import "./App.css";
 
 import * as licensing from "./licensing.js";
 
-const API_URL = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:3000`;
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  `${window.location.protocol}//${window.location.hostname}:3000`;
 
 const INITIAL_ITEMS_PER_CATEGORY = 30;
 const ITEMS_PER_CATEGORY_STEP = 30;
@@ -151,9 +153,8 @@ function getSeriesEpisode(item) {
 
   const prefix = title.slice(0, marker.index).trim();
   const seasonLabel = prefix.match(/\bS\d{1,3}\b/i);
-  const seriesTitle = (seasonLabel
-    ? prefix.slice(0, seasonLabel.index)
-    : prefix
+  const seriesTitle = (
+    seasonLabel ? prefix.slice(0, seasonLabel.index) : prefix
   )
     .replace(/[\s\-_.:]+$/g, "")
     .trim();
@@ -744,23 +745,64 @@ function Icon({ name }) {
   };
   switch (name) {
     case "home":
-      return (<svg {...common} fill="currentColor" stroke="none"><path d="M12 3 2 12h3v8h5v-5h4v5h5v-8h3z" /></svg>);
+      return (
+        <svg {...common} fill="currentColor" stroke="none">
+          <path d="M12 3 2 12h3v8h5v-5h4v5h5v-8h3z" />
+        </svg>
+      );
     case "tv":
-      return (<svg {...common}><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></svg>);
+      return (
+        <svg {...common}>
+          <rect x="3" y="4" width="18" height="12" rx="2" />
+          <path d="M8 20h8M12 16v4" />
+        </svg>
+      );
     case "film":
-      return (<svg {...common}><rect x="3" y="8" width="18" height="12" rx="2" /><path d="M3 8l2-4h4l-2 4M10 8l2-4h4l-2 4M17 8l2-4" /></svg>);
+      return (
+        <svg {...common}>
+          <rect x="3" y="8" width="18" height="12" rx="2" />
+          <path d="M3 8l2-4h4l-2 4M10 8l2-4h4l-2 4M17 8l2-4" />
+        </svg>
+      );
     case "series":
-      return (<svg {...common}><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 3l4 4 4-4" /></svg>);
+      return (
+        <svg {...common}>
+          <rect x="3" y="7" width="18" height="13" rx="2" />
+          <path d="M8 3l4 4 4-4" />
+        </svg>
+      );
     case "heart":
-      return (<svg {...common}><path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z" /></svg>);
+      return (
+        <svg {...common}>
+          <path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z" />
+        </svg>
+      );
     case "heart-fill":
-      return (<svg {...common} fill="currentColor"><path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z" /></svg>);
+      return (
+        <svg {...common} fill="currentColor">
+          <path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z" />
+        </svg>
+      );
     case "gear":
-      return (<svg {...common}><circle cx="12" cy="12" r="3" /><path d="M19.400 15a1.700 1.700 0 0 0 .3 1.800l.1.1a2 2 0 1 1-2.800 2.800l-.1-.1a1.700 1.700 0 0 0-1.800-.3 1.700 1.700 0 0 0-1 1.500V21a2 2 0 1 1-4 0v-.1a1.700 1.700 0 0 0-1.100-1.500 1.700 1.700 0 0 0-1.800.3l-.1.1a2 2 0 1 1-2.800-2.800l.1-.1a1.700 1.700 0 0 0 .3-1.800 1.700 1.700 0 0 0-1.500-1H3a2 2 0 1 1 0-4h.1a1.700 1.700 0 0 0 1.500-1.100 1.700 1.700 0 0 0-.3-1.800l-.1-.1a2 2 0 1 1 2.800-2.800l.1.1a1.700 1.700 0 0 0 1.800.3H9a1.700 1.700 0 0 0 1-1.500V3a2 2 0 1 1 4 0v.1a1.700 1.700 0 0 0 1 1.500 1.700 1.700 0 0 0 1.800-.3l.1-.1a2 2 0 1 1 2.800 2.800l-.1.1a1.700 1.700 0 0 0-.3 1.800V9a1.700 1.700 0 0 0 1.500 1H21a2 2 0 1 1 0 4h-.1a1.700 1.700 0 0 0-1.500 1z" /></svg>);
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.400 15a1.700 1.700 0 0 0 .3 1.800l.1.1a2 2 0 1 1-2.800 2.800l-.1-.1a1.700 1.700 0 0 0-1.800-.3 1.700 1.700 0 0 0-1 1.500V21a2 2 0 1 1-4 0v-.1a1.700 1.700 0 0 0-1.100-1.500 1.700 1.700 0 0 0-1.800.3l-.1.1a2 2 0 1 1-2.800-2.800l.1-.1a1.700 1.700 0 0 0 .3-1.800 1.700 1.700 0 0 0-1.500-1H3a2 2 0 1 1 0-4h.1a1.700 1.700 0 0 0 1.500-1.100 1.700 1.700 0 0 0-.3-1.800l-.1-.1a2 2 0 1 1 2.800-2.800l.1.1a1.700 1.700 0 0 0 1.800.3H9a1.700 1.700 0 0 0 1-1.500V3a2 2 0 1 1 4 0v.1a1.700 1.700 0 0 0 1 1.500 1.700 1.700 0 0 0 1.800-.3l.1-.1a2 2 0 1 1 2.800 2.800l-.1.1a1.700 1.700 0 0 0-.3 1.800V9a1.700 1.700 0 0 0 1.500 1H21a2 2 0 1 1 0 4h-.1a1.700 1.700 0 0 0-1.500 1z" />
+        </svg>
+      );
     case "chevron":
-      return (<svg {...common} width={18} height={18} strokeWidth={2.4}><path d="M9 5l7 7-7 7" /></svg>);
+      return (
+        <svg {...common} width={18} height={18} strokeWidth={2.4}>
+          <path d="M9 5l7 7-7 7" />
+        </svg>
+      );
     case "wifi":
-      return (<svg {...common} width={24} height={24}><path d="M2 9a15 15 0 0 1 20 0M5 12.500a10.500 10.500 0 0 1 14 0M8.500 16a5.500 5.500 0 0 1 7 0" /><circle cx="12" cy="19.500" r="1" fill="currentColor" /></svg>);
+      return (
+        <svg {...common} width={24} height={24}>
+          <path d="M2 9a15 15 0 0 1 20 0M5 12.500a10.500 10.500 0 0 1 14 0M8.500 16a5.500 5.500 0 0 1 7 0" />
+          <circle cx="12" cy="19.500" r="1" fill="currentColor" />
+        </svg>
+      );
     default:
       return null;
   }
@@ -796,7 +838,9 @@ const MediaCard = memo(function MediaCard({ item, onSelect, isFav, onFav }) {
           <button
             type="button"
             className={`fav ${isFav ? "on" : ""}`}
-            aria-label={isFav ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+            aria-label={
+              isFav ? "Remover dos favoritos" : "Adicionar aos favoritos"
+            }
             onClick={(e) => {
               e.stopPropagation();
               onFav(item);
@@ -816,7 +860,15 @@ const MediaCard = memo(function MediaCard({ item, onSelect, isFav, onFav }) {
    CATEGORY
 ========================================================= */
 
-function Category({ name, items, visibleCount, onShowMore, onSelect, favs, onFav }) {
+function Category({
+  name,
+  items,
+  visibleCount,
+  onShowMore,
+  onSelect,
+  favs,
+  onFav,
+}) {
   const visibleItems = items.slice(0, visibleCount);
 
   const hasMore = visibleCount < items.length;
@@ -851,10 +903,30 @@ function Category({ name, items, visibleCount, onShowMore, onSelect, favs, onFav
 }
 
 const HERO_SLIDES = [
-  { section: "canais", kicker: "AO VIVO", title: "TV ao vivo", text: "Seus canais favoritos, a qualquer hora." },
-  { section: "filmes", kicker: "CINEMA", title: "Filmes", text: "Do clássico ao lançamento, tudo no seu catálogo." },
-  { section: "series", kicker: "MARATONA", title: "Séries", text: "Temporadas completas para assistir sem pressa." },
-  { section: "favoritos", kicker: "SEU ESPAÇO", title: "Favoritos", text: "Tudo o que você mais gosta, a um clique." },
+  {
+    section: "canais",
+    kicker: "AO VIVO",
+    title: "TV ao vivo",
+    text: "Seus canais favoritos, a qualquer hora.",
+  },
+  {
+    section: "filmes",
+    kicker: "CINEMA",
+    title: "Filmes",
+    text: "Do clássico ao lançamento, tudo no seu catálogo.",
+  },
+  {
+    section: "series",
+    kicker: "MARATONA",
+    title: "Séries",
+    text: "Temporadas completas para assistir sem pressa.",
+  },
+  {
+    section: "favoritos",
+    kicker: "SEU ESPAÇO",
+    title: "Favoritos",
+    text: "Tudo o que você mais gosta, a um clique.",
+  },
 ];
 
 const NAV = [
@@ -903,7 +975,9 @@ export default function App() {
 
   const [favs, setFavs] = useState(() => {
     try {
-      return new Set(JSON.parse(localStorage.getItem("iptv-player-favs")) || []);
+      return new Set(
+        JSON.parse(localStorage.getItem("iptv-player-favs")) || [],
+      );
     } catch {
       return new Set();
     }
@@ -992,7 +1066,8 @@ export default function App() {
       }
       setDeviceStatus({
         state: "error",
-        message: "Não foi possível consultar o servidor. Verifique a conexão e tente novamente.",
+        message:
+          "Não foi possível consultar o servidor. Verifique a conexão e tente novamente.",
       });
     } finally {
       setLoading(false);
@@ -1004,12 +1079,18 @@ export default function App() {
     const requestedMac = macInput.trim();
     try {
       setLoading(true);
-      await licensing.activate(activationCode, requestedMac, { username: providerUser, password: providerPass });
+      await licensing.activate(activationCode, requestedMac, {
+        username: providerUser,
+        password: providerPass,
+      });
       setActivationCode("");
       setProviderPass("");
       await carregarDispositivo(requestedMac, true);
     } catch (e) {
-      setDeviceStatus({ state: "blocked", message: e.message || "Não foi possível ativar." });
+      setDeviceStatus({
+        state: "blocked",
+        message: e.message || "Não foi possível ativar.",
+      });
       setLoading(false);
     }
   }
@@ -1024,7 +1105,11 @@ export default function App() {
     const timer = setInterval(async () => {
       try {
         const s = await licensing.checkStatus(deviceMac);
-        if (!s.allowed) throw Object.assign(new Error(s.message || "Dispositivo sem acesso."), { status: 403 });
+        if (!s.allowed)
+          throw Object.assign(
+            new Error(s.message || "Dispositivo sem acesso."),
+            { status: 403 },
+          );
       } catch (e) {
         if (e.status === 401 || e.status === 403) {
           setSelectedItem(null);
@@ -1050,13 +1135,21 @@ export default function App() {
       setSelectedItem(null);
       setSelectedSeries({ ...item, episodes: [], loadingEpisodes: true });
       try {
-        const episodes = await licensing.loadSeriesEpisodes(deviceMac, item.seriesId);
+        const episodes = await licensing.loadSeriesEpisodes(
+          deviceMac,
+          item.seriesId,
+        );
         setSelectedSeries({ ...item, episodes, loadingEpisodes: false });
-        setSelectedSeason(episodes.length ? Math.min(...episodes.map((e) => e.season || 1)) : null);
+        setSelectedSeason(
+          episodes.length
+            ? Math.min(...episodes.map((e) => e.season || 1))
+            : null,
+        );
       } catch (e) {
         setSelectedSeries(null);
         setPlayerError(e.message || "Não foi possível carregar os episódios.");
-        if (e.status === 401 || e.status === 403) carregarDispositivo(deviceMac);
+        if (e.status === 401 || e.status === 403)
+          carregarDispositivo(deviceMac);
       }
       return;
     }
@@ -1121,39 +1214,43 @@ export default function App() {
      */
 
     if (section === "series") {
-       const seriesGroups = new Map();
+      const seriesGroups = new Map();
 
-       for (const [group, groupItems] of groups) {
-         // Séries Xtream já vêm agrupadas (episódios carregados ao abrir); M3U legado ainda é agrupado por título.
-         seriesGroups.set(
-           group,
-           groupItems.some((i) => i.seriesId)
-             ? groupItems.map((i) => ({ ...i, type: "series-group", episodes: [] }))
-             : groupSeries(groupItems),
-         );
-       }
+      for (const [group, groupItems] of groups) {
+        // Séries Xtream já vêm agrupadas (episódios carregados ao abrir); M3U legado ainda é agrupado por título.
+        seriesGroups.set(
+          group,
+          groupItems.some((i) => i.seriesId)
+            ? groupItems.map((i) => ({
+                ...i,
+                type: "series-group",
+                episodes: [],
+              }))
+            : groupSeries(groupItems),
+        );
+      }
 
-       if (!deferredSearch) return seriesGroups;
+      if (!deferredSearch) return seriesGroups;
 
-       const filteredSeries = new Map();
+      const filteredSeries = new Map();
 
-       for (const [group, series] of seriesGroups) {
-         const matches = series.filter(
-           (item) =>
-             item.title.toLowerCase().includes(deferredSearch) ||
-             item.episodes.some((episode) =>
-               episode.title.toLowerCase().includes(deferredSearch),
-             ),
-         );
+      for (const [group, series] of seriesGroups) {
+        const matches = series.filter(
+          (item) =>
+            item.title.toLowerCase().includes(deferredSearch) ||
+            item.episodes.some((episode) =>
+              episode.title.toLowerCase().includes(deferredSearch),
+            ),
+        );
 
-         if (matches.length) filteredSeries.set(group, matches);
-       }
+        if (matches.length) filteredSeries.set(group, matches);
+      }
 
-       return filteredSeries;
+      return filteredSeries;
     }
 
     if (!deferredSearch) {
-       return groups;
+      return groups;
     }
 
     /*
@@ -1229,7 +1326,10 @@ export default function App() {
 
   useEffect(() => {
     const t = setInterval(() => setClock(new Date()), 15_000);
-    const h = setInterval(() => setHeroIdx((i) => (i + 1) % HERO_SLIDES.length), 6000);
+    const h = setInterval(
+      () => setHeroIdx((i) => (i + 1) % HERO_SLIDES.length),
+      6000,
+    );
     const on = () => setOnline(true);
     const off = () => setOnline(false);
     window.addEventListener("online", on);
@@ -1243,11 +1343,16 @@ export default function App() {
   }, []);
 
   const featured = useMemo(() => {
-    const withImg = (type) => items.filter((i) => i.type === type && i.srcImage);
+    const withImg = (type) =>
+      items.filter((i) => i.type === type && i.srcImage);
     const mix = [];
     const movies = withImg("filmes");
     const series = withImg("series");
-    for (let k = 0; mix.length < 14 && (k < movies.length || k < series.length); k++) {
+    for (
+      let k = 0;
+      mix.length < 14 && (k < movies.length || k < series.length);
+      k++
+    ) {
       if (movies[k]) mix.push(movies[k]);
       if (series[k] && mix.length < 14) mix.push(series[k]);
     }
@@ -1310,14 +1415,21 @@ export default function App() {
     const type = section === "series" ? "series-group" : section;
     const q = deferredSearch;
     const favList = favItems.filter(
-      (i) => i.type === type && (!q || String(i.title || "").toLowerCase().includes(q)),
+      (i) =>
+        i.type === type &&
+        (!q ||
+          String(i.title || "")
+            .toLowerCase()
+            .includes(q)),
     );
     return [["Favoritos", favList], ...categories.entries()];
   }, [section, categories, favItems, deferredSearch]);
 
   const activeCat = useMemo(() => {
     if (catEntries.some(([n]) => n === selectedCat)) return selectedCat;
-    return (catEntries.find(([n, l]) => n !== "Favoritos" && l.length) || catEntries[0] || [])[0];
+    return (catEntries.find(([n, l]) => n !== "Favoritos" && l.length) ||
+      catEntries[0] ||
+      [])[0];
   }, [catEntries, selectedCat]);
 
   const activeList = useMemo(
@@ -1326,13 +1438,23 @@ export default function App() {
   );
 
   const shownPreview =
-    activeList.find((i) => favKey(i) === (previewItem && favKey(previewItem))) || activeList[0] || null;
+    activeList.find(
+      (i) => favKey(i) === (previewItem && favKey(previewItem)),
+    ) ||
+    activeList[0] ||
+    null;
 
   const isActive = deviceStatus.state === "active" && items.length > 0;
   const view = isActive ? section : "config";
   const slide = HERO_SLIDES[heroIdx];
-  const time = clock.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-  const showSearch = isActive && ["canais", "filmes", "series"].includes(section) && !selectedSeries;
+  const time = clock.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const showSearch =
+    isActive &&
+    ["canais", "filmes", "series"].includes(section) &&
+    !selectedSeries;
 
   return (
     <div className="app">
@@ -1345,9 +1467,17 @@ export default function App() {
                 <stop offset="1" stopColor="#3b3fd8" />
               </linearGradient>
             </defs>
-            <path d="M6 5l30 16L6 37z" fill="none" stroke="url(#dg)" strokeWidth="5" strokeLinejoin="round" />
+            <path
+              d="M6 5l30 16L6 37z"
+              fill="none"
+              stroke="url(#dg)"
+              strokeWidth="5"
+              strokeLinejoin="round"
+            />
           </svg>
-          <span>DELTA <b>TV</b></span>
+          <span>
+            DELTA <b>TV</b>
+          </span>
         </div>
 
         <nav className="nav" aria-label="Menu principal">
@@ -1392,73 +1522,95 @@ export default function App() {
             <span />
           )}
           <div className="clock">
-            <span className={online ? "" : "offline"}><Icon name="wifi" /></span>
+            <span className={online ? "" : "offline"}>
+              <Icon name="wifi" />
+            </span>
             <time>{time}</time>
           </div>
         </div>
 
         {/* ================= PLAYER ================= */}
-        {selectedItem && (() => {
-          const docked = !playerExpanded && section === "canais" && !!slot;
-          return (
-            <section
-              className={`player ${playerExpanded ? "expanded" : docked ? "docked" : "pip"}`}
-              style={
-                docked
-                  ? { top: slot.top, left: slot.left, width: slot.width, height: slot.height }
-                  : undefined
-              }
-            >
-              <div className="player-video">
-                <VideoPlayer
-                  src={selectedItem.playUrl}
-                  title={selectedItem.title}
-                  type={selectedItem.type}
-                  deviceMac={deviceMac}
-                  onError={(message) => {
-                    setPlayerError(message);
-                  }}
-                />
+        {selectedItem &&
+          (() => {
+            const docked = !playerExpanded && section === "canais" && !!slot;
+            return (
+              <section
+                className={`player ${playerExpanded ? "expanded" : docked ? "docked" : "pip"}`}
+                style={
+                  docked
+                    ? {
+                        top: slot.top,
+                        left: slot.left,
+                        width: slot.width,
+                        height: slot.height,
+                      }
+                    : undefined
+                }
+              >
+                <div className="player-video">
+                  <VideoPlayer
+                    src={selectedItem.playUrl}
+                    title={selectedItem.title}
+                    type={selectedItem.type}
+                    deviceMac={deviceMac}
+                    onError={(message) => {
+                      setPlayerError(message);
+                    }}
+                  />
 
-                {playerError && (
-                  <div className="player-error">
-                    <strong>Não foi possível reproduzir</strong>
-                    <p>{playerError}</p>
+                  {playerError && (
+                    <div className="player-error">
+                      <strong>Não foi possível reproduzir</strong>
+                      <p>{playerError}</p>
+                    </div>
+                  )}
+
+                  <div className="player-bar">
+                    <span className="player-bar-title">
+                      {selectedItem.title}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPlayerExpanded((v) => !v)}
+                      title={playerExpanded ? "Diminuir (Esc)" : "Expandir"}
+                      aria-label={playerExpanded ? "Diminuir" : "Expandir"}
+                    >
+                      {playerExpanded ? "⤡ Diminuir" : "⤢ Expandir"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closePlayer}
+                      title="Fechar"
+                      aria-label="Fechar"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                {playerExpanded && (
+                  <div className="player-info">
+                    {selectedItem.srcImage && (
+                      <img
+                        src={selectedItem.srcImage}
+                        alt=""
+                        width="55"
+                        height="75"
+                      />
+                    )}
+                    <div className="player-details">
+                      <h2>{selectedItem.title}</h2>
+                      <p>{selectedItem.group}</p>
+                    </div>
                   </div>
                 )}
+              </section>
+            );
+          })()}
 
-                <div className="player-bar">
-                  <span className="player-bar-title">{selectedItem.title}</span>
-                  <button
-                    type="button"
-                    onClick={() => setPlayerExpanded((v) => !v)}
-                    title={playerExpanded ? "Diminuir (Esc)" : "Expandir"}
-                    aria-label={playerExpanded ? "Diminuir" : "Expandir"}
-                  >
-                    {playerExpanded ? "⤡ Diminuir" : "⤢ Expandir"}
-                  </button>
-                  <button type="button" onClick={closePlayer} title="Fechar" aria-label="Fechar">
-                    ✕
-                  </button>
-                </div>
-              </div>
-
-              {playerExpanded && (
-                <div className="player-info">
-                  {selectedItem.srcImage && (
-                    <img src={selectedItem.srcImage} alt="" width="55" height="75" />
-                  )}
-                  <div className="player-details">
-                    <h2>{selectedItem.title}</h2>
-                    <p>{selectedItem.group}</p>
-                  </div>
-                </div>
-              )}
-            </section>
-          );
-        })()}
-
-        {playerError && !selectedItem && <div className="toast-error">{playerError}</div>}
+        {playerError && !selectedItem && (
+          <div className="toast-error">{playerError}</div>
+        )}
 
         {/* ================= INÍCIO ================= */}
         {view === "inicio" && (
@@ -1479,16 +1631,37 @@ export default function App() {
 
             <div className="tiles">
               {[
-                { id: "canais", icon: "tv", title: "TV ao vivo", text: "Assista aos canais" },
-                { id: "filmes", icon: "film", title: "Filmes", text: "Explore o catálogo" },
-                { id: "series", icon: "series", title: "Séries", text: "Suas séries favoritas" },
+                {
+                  id: "canais",
+                  icon: "tv",
+                  title: "TV ao vivo",
+                  text: "Assista aos canais",
+                },
+                {
+                  id: "filmes",
+                  icon: "film",
+                  title: "Filmes",
+                  text: "Explore o catálogo",
+                },
+                {
+                  id: "series",
+                  icon: "series",
+                  title: "Séries",
+                  text: "Suas séries favoritas",
+                },
               ].map((t) => (
-                <button key={t.id} className={`tile tile-${t.id}`} onClick={() => changeSection(t.id)}>
+                <button
+                  key={t.id}
+                  className={`tile tile-${t.id}`}
+                  onClick={() => changeSection(t.id)}
+                >
                   <Icon name={t.icon} />
                   <strong>{t.title}</strong>
                   <span>{t.text}</span>
                   <small>{counts[t.id].toLocaleString("pt-BR")} itens</small>
-                  <i className="tile-arrow"><Icon name="chevron" /></i>
+                  <i className="tile-arrow">
+                    <Icon name="chevron" />
+                  </i>
                 </button>
               ))}
             </div>
@@ -1520,7 +1693,9 @@ export default function App() {
         {/* ================= FAVORITOS ================= */}
         {view === "favoritos" && (
           <main className="content">
-            <div className="page-title"><h1>Favoritos</h1></div>
+            <div className="page-title">
+              <h1>Favoritos</h1>
+            </div>
             {favItems.length ? (
               <div className="grid">
                 {favItems.map((item, n) => (
@@ -1534,7 +1709,9 @@ export default function App() {
                 ))}
               </div>
             ) : (
-              <div className="empty">Toque no coração de um canal, filme ou série para salvá-lo aqui.</div>
+              <div className="empty">
+                Toque no coração de um canal, filme ou série para salvá-lo aqui.
+              </div>
             )}
           </main>
         )}
@@ -1572,56 +1749,71 @@ export default function App() {
                   ? "MAC simulado para desenvolvimento; o navegador não fornece o MAC físico."
                   : "MAC informado manualmente para validação."}
               </p>
-              <div className={`device-status ${deviceStatus.state}`} role="status" aria-live="polite">
+              <div
+                className={`device-status ${deviceStatus.state}`}
+                role="status"
+                aria-live="polite"
+              >
                 {deviceStatus.message}
               </div>
             </section>
 
-            {deviceStatus.state !== "active" && deviceStatus.state !== "checking" && (
-              <section className="panel">
-                <h3>Código de ativação</h3>
-                <form className="device-check stack" onSubmit={ativarDispositivo}>
-                  <input
-                    type="text"
-                    aria-label="Código"
-                    placeholder="Código (ex.: 4343)"
-                    autoComplete="off"
-                    value={activationCode}
-                    onChange={(event) => setActivationCode(event.target.value)}
-                  />
-                  {!licensing.isLicenseCode(activationCode) && (
-                    <>
-                      <input
-                        type="text"
-                        aria-label="Usuário"
-                        placeholder="Usuário"
-                        autoComplete="username"
-                        value={providerUser}
-                        onChange={(event) => setProviderUser(event.target.value)}
-                      />
-                      <input
-                        type="password"
-                        aria-label="Senha"
-                        placeholder="Senha"
-                        autoComplete="current-password"
-                        value={providerPass}
-                        onChange={(event) => setProviderPass(event.target.value)}
-                      />
-                    </>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={
-                      loading ||
-                      !activationCode.trim() ||
-                      (!licensing.isLicenseCode(activationCode) && (!providerUser || !providerPass))
-                    }
+            {deviceStatus.state !== "active" &&
+              deviceStatus.state !== "checking" && (
+                <section className="panel">
+                  <h3>Código de ativação</h3>
+                  <form
+                    className="device-check stack"
+                    onSubmit={ativarDispositivo}
                   >
-                    Entrar
-                  </button>
-                </form>
-              </section>
-            )}
+                    <input
+                      type="text"
+                      aria-label="Código"
+                      placeholder="Código (ex.: 4343)"
+                      autoComplete="off"
+                      value={activationCode}
+                      onChange={(event) =>
+                        setActivationCode(event.target.value)
+                      }
+                    />
+                    {!licensing.isLicenseCode(activationCode) && (
+                      <>
+                        <input
+                          type="text"
+                          aria-label="Usuário"
+                          placeholder="Usuário"
+                          autoComplete="username"
+                          value={providerUser}
+                          onChange={(event) =>
+                            setProviderUser(event.target.value)
+                          }
+                        />
+                        <input
+                          type="password"
+                          aria-label="Senha"
+                          placeholder="Senha"
+                          autoComplete="current-password"
+                          value={providerPass}
+                          onChange={(event) =>
+                            setProviderPass(event.target.value)
+                          }
+                        />
+                      </>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={
+                        loading ||
+                        !activationCode.trim() ||
+                        (!licensing.isLicenseCode(activationCode) &&
+                          (!providerUser || !providerPass))
+                      }
+                    >
+                      Entrar
+                    </button>
+                  </form>
+                </section>
+              )}
 
             {isActive && (
               <section className="panel">
@@ -1632,7 +1824,11 @@ export default function App() {
                   {counts.filmes.toLocaleString("pt-BR")} filmes ·{" "}
                   {counts.series.toLocaleString("pt-BR")} séries
                 </p>
-                <button className="secondary" onClick={() => carregarDispositivo(deviceMac)} disabled={loading}>
+                <button
+                  className="secondary"
+                  onClick={() => carregarDispositivo(deviceMac)}
+                  disabled={loading}
+                >
                   Atualizar catálogo
                 </button>
               </section>
@@ -1641,7 +1837,8 @@ export default function App() {
         )}
 
         {/* ================= CANAIS / FILMES / SÉRIES ================= */}
-        {isActive && ["canais", "filmes", "series"].includes(section) &&
+        {isActive &&
+          ["canais", "filmes", "series"].includes(section) &&
           (selectedSeries ? (
             <main className="content">
               <button
@@ -1657,7 +1854,9 @@ export default function App() {
 
               <section className="series-detail">
                 <div className="series-heading">
-                  {selectedSeries.srcImage && <img src={selectedSeries.srcImage} alt="" />}
+                  {selectedSeries.srcImage && (
+                    <img src={selectedSeries.srcImage} alt="" />
+                  )}
                   <div>
                     <h2>{selectedSeries.title}</h2>
                     <p>
@@ -1682,7 +1881,9 @@ export default function App() {
 
                 <div className="episode-list">
                   {selectedSeries.episodes
-                    .filter((episode) => (episode.season || 1) === selectedSeason)
+                    .filter(
+                      (episode) => (episode.season || 1) === selectedSeason,
+                    )
                     .map((episode, index) => (
                       <button
                         className="episode"
@@ -1690,9 +1891,15 @@ export default function App() {
                         onClick={() => selectItem(episode)}
                       >
                         <span className="episode-number">
-                          E{String(episode.episode || index + 1).padStart(2, "0")}
+                          E
+                          {String(episode.episode || index + 1).padStart(
+                            2,
+                            "0",
+                          )}
                         </span>
-                        <span className="episode-title">{episode.episodeTitle || episode.title}</span>
+                        <span className="episode-title">
+                          {episode.episodeTitle || episode.title}
+                        </span>
                         <span className="episode-play">▶ Assistir</span>
                       </button>
                     ))}
@@ -1705,7 +1912,11 @@ export default function App() {
                 <h1>{NAV.find((n) => n.id === section).label}</h1>
                 <p>
                   {activeList.length.toLocaleString("pt-BR")}{" "}
-                  {section === "canais" ? "canais" : section === "filmes" ? "filmes" : "séries"}
+                  {section === "canais"
+                    ? "canais"
+                    : section === "filmes"
+                      ? "filmes"
+                      : "séries"}
                 </p>
               </div>
 
@@ -1722,12 +1933,13 @@ export default function App() {
                         }}
                         title={`${name} (${list.length})`}
                       >
-                        <span className="folder-icon">{name === "Favoritos" ? "" : "▶"}</span>
                         <span className="folder-name">{name}</span>
                       </button>
                     </li>
                   ))}
-                  {!catEntries.length && <li className="empty">Nada encontrado.</li>}
+                  {!catEntries.length && (
+                    <li className="empty">Nada encontrado.</li>
+                  )}
                 </ul>
 
                 {section === "canais" ? (
@@ -1744,14 +1956,24 @@ export default function App() {
                             onDoubleClick={() => selectItem(item)}
                           >
                             <span className="channel-logo">
-                              {item.srcImage ? <img src={item.srcImage} alt="" loading="lazy" /> : null}
+                              {item.srcImage ? (
+                                <img
+                                  src={item.srcImage}
+                                  alt=""
+                                  loading="lazy"
+                                />
+                              ) : null}
                             </span>
                             <span className="channel-name">{item.title}</span>
-                            {favs.has(favKey(item)) && <span className="channel-fav">♥</span>}
+                            {favs.has(favKey(item)) && (
+                              <span className="channel-fav">♥</span>
+                            )}
                           </button>
                         </li>
                       ))}
-                      {!activeList.length && <li className="empty">Nenhum canal nesta pasta.</li>}
+                      {!activeList.length && (
+                        <li className="empty">Nenhum canal nesta pasta.</li>
+                      )}
                     </ul>
 
                     <aside className="preview">
@@ -1769,7 +1991,10 @@ export default function App() {
                             </div>
                           </div>
                           <div className="preview-actions">
-                            <button className="watch" onClick={() => selectItem(shownPreview)}>
+                            <button
+                              className="watch"
+                              onClick={() => selectItem(shownPreview)}
+                            >
                               ▶ Assistir ao vivo
                             </button>
                             <button
@@ -1777,10 +2002,19 @@ export default function App() {
                               onClick={() => toggleFav(shownPreview)}
                               aria-label="Favoritar"
                             >
-                              <Icon name={favs.has(favKey(shownPreview)) ? "heart-fill" : "heart"} />
+                              <Icon
+                                name={
+                                  favs.has(favKey(shownPreview))
+                                    ? "heart-fill"
+                                    : "heart"
+                                }
+                              />
                             </button>
                           </div>
-                          <small className="hint">Clique para ver • Assistir ou duplo clique: tocar aqui • ⤢ expandir • ♥ favoritar</small>
+                          <small className="hint">
+                            Clique para ver • Assistir ou duplo clique: tocar
+                            aqui • ⤢ expandir • ♥ favoritar
+                          </small>
                         </>
                       ) : (
                         <div className="empty">Selecione um canal.</div>
@@ -1791,7 +2025,11 @@ export default function App() {
                   <div className="folder-content">
                     <div className="grid">
                       {activeList
-                        .slice(0, visibleCounts[activeCat] || INITIAL_ITEMS_PER_CATEGORY)
+                        .slice(
+                          0,
+                          visibleCounts[activeCat] ||
+                            INITIAL_ITEMS_PER_CATEGORY,
+                        )
                         .map((item, n) => (
                           <MediaCard
                             key={`${favKey(item)}-${n}`}
@@ -1802,12 +2040,23 @@ export default function App() {
                           />
                         ))}
                     </div>
-                    {activeList.length > (visibleCounts[activeCat] || INITIAL_ITEMS_PER_CATEGORY) && (
-                      <button className="show-more" onClick={() => showMore(activeCat)}>
-                        Ver mais ({activeList.length - (visibleCounts[activeCat] || INITIAL_ITEMS_PER_CATEGORY)})
+                    {activeList.length >
+                      (visibleCounts[activeCat] ||
+                        INITIAL_ITEMS_PER_CATEGORY) && (
+                      <button
+                        className="show-more"
+                        onClick={() => showMore(activeCat)}
+                      >
+                        Ver mais (
+                        {activeList.length -
+                          (visibleCounts[activeCat] ||
+                            INITIAL_ITEMS_PER_CATEGORY)}
+                        )
                       </button>
                     )}
-                    {!activeList.length && <div className="empty">Nenhum item nesta pasta.</div>}
+                    {!activeList.length && (
+                      <div className="empty">Nenhum item nesta pasta.</div>
+                    )}
                   </div>
                 )}
               </div>
