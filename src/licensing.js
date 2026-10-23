@@ -142,12 +142,44 @@ export async function activate(code, mac, { username = "", password = "" } = {})
   return data;
 }
 
-// Migração: dispositivos do sistema antigo reivindicam a ativação existente (primeiro acesso).
+// Primeiro acesso de um MAC já cadastrado: usa a MESMA rota do app Roku (POST /register, depois /lists).
+// Estados devolvidos pelo servidor: configured_partner | configured_playlist (vem com tokens), awaiting_configuration,
+// session_required, expired | disabled | deactivated. Sem sessão a conceder, lança NOTHING_TO_CLAIM (404) e o
+// App.jsx pede o código de ativação.
+const CONFIGURED = new Set(["configured_partner", "configured_playlist", "configured"]);
+
 export async function claimLegacy(mac) {
-  const data = await call("/claim", { method: "POST", body: { mac, installationId: getInstallationId() } });
-  putSession(mac, data.activationId, data.tokens);
-  xtreamCache = null;
-  return data;
+  const data = await call("/register", { method: "POST", body: { mac, installationId: getInstallationId() } });
+  const status = String(data.status || data.configurationStatus || "");
+  let stored = 0;
+
+  // Um MAC pode ter vários parceiros: o servidor pode devolver uma sessão por lista em data.activations[].tokens.
+  const acts = Array.isArray(data.activations) ? data.activations : [];
+  for (const a of acts) {
+    if (a?.activationId && a?.tokens?.accessToken && a?.tokens?.refreshToken && CONFIGURED.has(String(a.status))) {
+      putSession(mac, a.activationId, a.tokens, { makeCurrent: stored === 0 });
+      stored++;
+    }
+  }
+  // Sessão principal (mesmo formato do Roku: data.tokens + data.activationId).
+  if (data.tokens?.accessToken && data.tokens?.refreshToken && CONFIGURED.has(status)) {
+    const id = data.activationId || LEGACY;
+    putSession(mac, id, data.tokens, { makeCurrent: stored === 0 });
+    stored++;
+  }
+  if (stored) {
+    xtreamCache = null;
+    return data;
+  }
+
+  if (status === "expired" || status === "disabled" || status === "deactivated") {
+    throw Object.assign(new Error(data.message || "Este dispositivo está bloqueado ou expirado."), {
+      code: status.toUpperCase(),
+      status: 403,
+    });
+  }
+  // awaiting_configuration / session_required / sem sessão: precisa ativar com o código.
+  throw Object.assign(new Error(data.message || "Dispositivo não ativado."), { code: "NOTHING_TO_CLAIM", status: 404 });
 }
 
 // Access token da lista indicada (padrão: a atual). Renova com o refresh token quando perto de expirar.
@@ -263,6 +295,11 @@ async function getXtreamConfig(mac, force = false) {
     return xtreamCache.cfg;
   }
   const cfg = await authed(mac, "/xtream");
+  // Como no Roku (GatewayPath): caminho relativo do servidor vira URL absoluta do back-end.
+  if (typeof cfg.baseUrl === "string" && cfg.baseUrl.startsWith("/")) cfg.baseUrl = `${API_URL}${cfg.baseUrl}`;
+  if (cfg.mirror && typeof cfg.mirror === "object" && String(cfg.mirror.baseUrl || "").startsWith("/")) {
+    cfg.mirror = { ...cfg.mirror, baseUrl: `${API_URL}${cfg.mirror.baseUrl}` };
+  }
   xtreamCache = { key, at: Date.now(), cfg };
   return cfg;
 }
@@ -280,10 +317,41 @@ const connOf = (cfg, useMirror) => {
 
 async function xtreamApi(conn, action, params = {}) {
   const qs = new URLSearchParams({ username: conn.username, password: conn.password, action, ...params });
-  let res;
-  try {
-    res = await fetch(`${trimSlash(conn.baseUrl)}/player_api.php?${qs}`);
-  } catch {
+  const url = `${trimSlash(conn.baseUrl)}/player_api.php?${qs}`;
+  let unreachable = false;
+  let lastStatus = 0;
+  // Painéis Xtream respondem 404/5xx ou uma página HTML de forma intermitente: até 3 tentativas, como o app Roku.
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    let res;
+    try {
+      res = await fetch(url);
+      unreachable = false;
+    } catch {
+      unreachable = true;
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 400));
+      continue;
+    }
+    lastStatus = res.status;
+    if (res.ok) {
+      const text = (await res.text().catch(() => "")).trim();
+      if (text === "null" || text === "false") return [];
+      if (text[0] === "[" || text[0] === "{") {
+        try {
+          const data = JSON.parse(text);
+          return Array.isArray(data) ? data : data || [];
+        } catch { /* JSON truncado: tenta de novo */ }
+      }
+    } else if (conn.isMirror && (res.status === 401 || res.status === 503)) {
+      // A rota espelho responde 401 (sessão encerrada) / 503 (serviço indisponível) com { code, message }.
+      const body = await res.json().catch(() => null);
+      throw Object.assign(new Error(body?.message || "O provedor recusou a consulta."), {
+        code: body?.code || "PROVIDER_ERROR",
+        status: res.status,
+      });
+    }
+    if (attempt < 3) await new Promise((r) => setTimeout(r, 400));
+  }
+  if (unreachable) {
     throw Object.assign(
       new Error(
         "Não foi possível acessar o provedor pelo navegador (bloqueio de CORS ou conteúdo misto http/https). " +
@@ -292,17 +360,14 @@ async function xtreamApi(conn, action, params = {}) {
       { code: "PROVIDER_UNREACHABLE", status: 502 },
     );
   }
-  if (!res.ok) {
-    // A rota espelho responde 401 (sessão encerrada) / 503 (serviço indisponível) com { code, message }.
-    const body = conn.isMirror ? await res.json().catch(() => null) : null;
-    const status = conn.isMirror && (res.status === 401 || res.status === 503) ? res.status : 502;
-    throw Object.assign(new Error(body?.message || "O provedor recusou a consulta."), {
-      code: body?.code || "PROVIDER_ERROR",
-      status,
-    });
-  }
-  const data = await res.json().catch(() => null);
-  return Array.isArray(data) ? data : data || [];
+  throw Object.assign(
+    new Error(
+      lastStatus === 401 || lastStatus === 403
+        ? `O provedor recusou o acesso (HTTP ${lastStatus}). Verifique usuário e senha.`
+        : "O provedor recusou a consulta.",
+    ),
+    { code: "PROVIDER_ERROR", status: 502 },
+  );
 }
 
 // Executa `run(conn, cfg)` com a conexão da lista atual, com os planos B:
@@ -362,26 +427,38 @@ export async function loadCatalog(mac) {
 
     const items = [];
     const errors = [];
-    // As listas grandes (dezenas de MB) são lidas UMA POR VEZ: cada resposta bruta vira itens enxutos e é
-    // descartada antes da próxima, em vez de manter as três na memória ao mesmo tempo.
-    const step = async (action, build) => {
-      try {
-        const raw = asArray(await xtreamApi(conn, action));
-        for (const row of raw) items.push(build(row));
-      } catch (e) {
-        if (e.status === 401) throw e;
-        errors.push(e);
-      }
+    // Como no app Roku: uma categoria por vez (?category_id=...), nunca a lista inteira de dezenas de MB.
+    // 4 categorias em paralelo; cada resposta vira itens enxutos e é descartada.
+    const step = async (action, groups, build) => {
+      const ids = [...groups.keys()];
+      let next = 0;
+      let failed = 0;
+      let firstErr = null;
+      const worker = async () => {
+        while (next < ids.length) {
+          const id = ids[next++];
+          try {
+            const raw = asArray(await xtreamApi(conn, action, { category_id: id }));
+            for (const row of raw) items.push(build(row));
+          } catch (e) {
+            if (e.status === 401) throw e;
+            failed++;
+            firstErr = firstErr || e;
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(4, ids.length) }, worker));
+      if (ids.length && failed === ids.length) errors.push(firstErr);
     };
 
-    await step("get_live_streams", (c) => ({
+    await step("get_live_streams", liveGroups, (c) => ({
       type: "canais",
       title: c.name,
       group: liveGroups.get(String(c.category_id)) || "Sem categoria",
       srcImage: c.stream_icon || "",
       srcVideo: `${base}/live/${auth}/${c.stream_id}.ts`,
     }));
-    await step("get_vod_streams", (m) => ({
+    await step("get_vod_streams", vodGroups, (m) => ({
       type: "filmes",
       title: m.title || m.name,
       group: vodGroups.get(String(m.category_id)) || "Sem categoria",
@@ -389,7 +466,7 @@ export async function loadCatalog(mac) {
       srcVideo: `${base}/movie/${auth}/${m.stream_id}.${m.container_extension || "mp4"}`,
     }));
     // Séries: só a lista; temporadas/episódios chegam sob demanda (loadSeriesEpisodes).
-    await step("get_series", (s) => ({
+    await step("get_series", serGroups, (s) => ({
       type: "series",
       seriesId: s.series_id,
       title: s.title || s.name,
