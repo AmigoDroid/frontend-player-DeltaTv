@@ -125,6 +125,7 @@ export const clearSession = () => {
   localStorage.removeItem(KEY_SESSION);
   xtreamCache = null;
   preferMirror.clear();
+  cacheClearAll(); // sair/limpar sessão também apaga o catálogo guardado neste navegador
 };
 
 // Código de licença individual é longo (LIC-XXXXX-…); código de parceria é curto (4–12 letras/números).
@@ -422,71 +423,151 @@ const asArray = (v) => (Array.isArray(v) ? v : []);
 const categoryMap = (list) => new Map(asArray(list).map((c) => [String(c.category_id), c.category_name]));
 const authOf = (conn) => `${encodeURIComponent(conn.username)}/${encodeURIComponent(conn.password)}`;
 
-export async function loadCatalog(mac) {
-  // abertura/atualização: sempre confere a autorização no servidor
-  xtreamCache = null;
+/* ---------------------------------------------------------------------------
+ * Cache OFFLINE do catálogo (IndexedDB)
+ * O catálogo tem dezenas de milhares de itens: não cabe no localStorage (limite ~5 MB), por isso usa IndexedDB.
+ * Guarda só dados enxutos (título, grupo, imagem, id) — NUNCA links de reprodução: usuário/senha/token são
+ * recolocados a cada abertura com a conexão atual, então um token vencido no cache não quebra a reprodução.
+ *  - até FRESH_MS: usa o cache e não consulta o provedor;
+ *  - até MAX_STALE_MS: mostra o cache na hora e atualiza em segundo plano (onUpdate);
+ *  - sem rede/provedor fora do ar: mostra o cache, por mais velho que seja.
+ * ------------------------------------------------------------------------- */
+const CACHE_DB = "iptv-catalog-cache";
+const CACHE_STORE = "catalogs";
+const CACHE_VERSION = 1;
+const FRESH_MS = 30 * 60_000; // 30 min
+const MAX_STALE_MS = 7 * 24 * 60 * 60_000; // 7 dias
+
+const openCacheDb = () =>
+  new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") return reject(new Error("sem IndexedDB"));
+    const r = indexedDB.open(CACHE_DB, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(CACHE_STORE);
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+
+async function cacheOp(mode, fn) {
+  const db = await openCacheDb();
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(CACHE_STORE, mode);
+      const req = fn(tx.objectStore(CACHE_STORE));
+      tx.oncomplete = () => resolve(req?.result ?? null);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+const cacheGet = (key) =>
+  cacheOp("readonly", (st) => st.get(key))
+    .then((v) => (v && v.v === CACHE_VERSION && Array.isArray(v.items) ? v : null))
+    .catch(() => null);
+const cacheSet = (key, items) =>
+  cacheOp("readwrite", (st) => st.put({ v: CACHE_VERSION, at: Date.now(), items }, key)).catch(() => {}); // cheio/bloqueado: segue sem cache
+const cacheClearAll = () => cacheOp("readwrite", (st) => st.clear()).catch(() => {});
+
+const catalogKey = (mac) => `${mac}|${currentListId(mac)}`;
+
+// Monta o link de reprodução com a conexão ATUAL (o cache não guarda links).
+const withLink = (c, base, auth) => {
+  if (c.type === "canais") c.srcVideo = `${base}/live/${auth}/${c.id}.m3u8`; // HLS primeiro; o player cai para .ts sozinho
+  else if (c.type === "filmes") c.srcVideo = `${base}/movie/${auth}/${c.id}.${c.ext || "mp4"}`;
+  else c.srcVideo = `series:${c.seriesId}`;
+  return c;
+};
+
+// Busca o catálogo no provedor: 3 categorias + 3 listas inteiras (uma por tipo). Devolve itens enxutos, sem link.
+async function fetchCatalogFresh(conn) {
+  // Categorias são pequenas. Uma de cada vez: muitos painéis limitam as conexões simultâneas por usuário.
+  const cats = [];
+  for (const action of ["get_live_categories", "get_vod_categories", "get_series_categories"]) {
+    try {
+      cats.push({ status: "fulfilled", value: await xtreamApi(conn, action) });
+    } catch (reason) {
+      if (reason?.status === 401) throw reason;
+      cats.push({ status: "rejected", reason });
+    }
+  }
+  if (cats.every((r) => r.status === "rejected")) throw cats[0].reason;
+  const [liveGroups, vodGroups, serGroups] = cats.map((r) => categoryMap(r.status === "fulfilled" ? r.value : []));
+
+  const items = [];
+  const errors = [];
+  // Uma requisição por TIPO (sem category_id), em sequência; cada resposta vira itens enxutos antes da próxima.
+  const loadAll = async (action, build) => {
+    try {
+      for (const row of asArray(await xtreamApi(conn, action))) items.push(build(row));
+    } catch (e) {
+      if (e.status === 401) throw e;
+      errors.push(e);
+    }
+  };
+  await loadAll("get_live_streams", (c) => ({
+    type: "canais", id: c.stream_id, title: c.name,
+    group: liveGroups.get(String(c.category_id)) || "Sem categoria", srcImage: c.stream_icon || "",
+  }));
+  await loadAll("get_vod_streams", (m) => ({
+    type: "filmes", id: m.stream_id, ext: m.container_extension || "mp4", title: m.title || m.name,
+    group: vodGroups.get(String(m.category_id)) || "Sem categoria", srcImage: m.stream_icon || "",
+  }));
+  await loadAll("get_series", (s) => ({
+    type: "series", seriesId: s.series_id, title: s.title || s.name,
+    group: serGroups.get(String(s.category_id)) || "Sem categoria", srcImage: s.cover || "",
+  }));
+
+  if (!items.length && errors.length) throw errors[0];
+  return { items, complete: errors.length === 0 };
+}
+
+/**
+ * Carrega o catálogo da lista atual.
+ * @param {object} [opts]
+ * @param {boolean} [opts.force]      ignora o cache (botão "Atualizar catálogo")
+ * @param {(data:object)=>void} [opts.onUpdate]  chamado quando uma atualização em segundo plano termina
+ */
+export async function loadCatalog(mac, { force = false, onUpdate } = {}) {
+  xtreamCache = null; // abertura: sempre confere a autorização no servidor (1 chamada leve a /xtream)
   return withProvider(mac, async (conn, cfg) => {
     const base = trimSlash(conn.baseUrl);
     const auth = authOf(conn);
+    const key = catalogKey(mac);
+    const result = (items, extra = {}) => ({ items, account: cfg.account, expiresAt: cfg.expiresAt, mode: cfg.mode, ...extra });
 
-    // Categorias são pequenas: em paralelo. Se TODAS falharem, o erro sobe (e o plano B de withProvider entra).
-    // Um de cada vez, como o Roku: muitos painéis limitam as conexões simultâneas por usuário e respondem com erro.
-    const cats = [];
-    for (const action of ["get_live_categories", "get_vod_categories", "get_series_categories"]) {
-      try {
-        cats.push({ status: "fulfilled", value: await xtreamApi(conn, action) });
-      } catch (reason) {
-        if (reason?.status === 401) throw reason;
-        cats.push({ status: "rejected", reason });
-      }
-    }
-    if (cats.every((r) => r.status === "rejected")) throw cats[0].reason;
-    const authFail = cats.find((r) => r.status === "rejected" && r.reason?.status === 401);
-    if (authFail) throw authFail.reason;
-    const [liveGroups, vodGroups, serGroups] = cats.map((r) => categoryMap(r.status === "fulfilled" ? r.value : []));
-
-    const items = [];
-    const errors = [];
-    // Uma requisição por TIPO (sem category_id): a lista inteira de canais, de filmes e de séries.
-    // Em sequência (uma conexão por vez) e cada resposta vira itens enxutos antes da próxima ser pedida,
-    // para a memória não acumular três listas grandes ao mesmo tempo.
-    const loadAll = async (action, groups, build) => {
-      try {
-        const raw = asArray(await xtreamApi(conn, action));
-        for (const row of raw) items.push(build(row));
-      } catch (e) {
-        if (e.status === 401) throw e;
-        errors.push(e);
-      }
+    const refresh = async () => {
+      const fresh = await fetchCatalogFresh(conn);
+      if (fresh.complete && fresh.items.length) await cacheSet(key, fresh.items); // lista incompleta não vira cache
+      fresh.items.forEach((c) => withLink(c, base, auth));
+      return fresh.items;
     };
 
-    await loadAll("get_live_streams", liveGroups, (c) => ({
-      type: "canais",
-      title: c.name,
-      group: liveGroups.get(String(c.category_id)) || "Sem categoria",
-      srcImage: c.stream_icon || "",
-      // HLS primeiro, como o app Roku; o player cai para .ts sozinho se o HLS falhar.
-      srcVideo: `${base}/live/${auth}/${c.stream_id}.m3u8`,
-    }));
-    await loadAll("get_vod_streams", vodGroups, (m) => ({
-      type: "filmes",
-      title: m.title || m.name,
-      group: vodGroups.get(String(m.category_id)) || "Sem categoria",
-      srcImage: m.stream_icon || "",
-      srcVideo: `${base}/movie/${auth}/${m.stream_id}.${m.container_extension || "mp4"}`,
-    }));
-    // Séries: só a lista; temporadas/episódios chegam sob demanda (loadSeriesEpisodes).
-    await loadAll("get_series", serGroups, (s) => ({
-      type: "series",
-      seriesId: s.series_id,
-      title: s.title || s.name,
-      group: serGroups.get(String(s.category_id)) || "Sem categoria",
-      srcImage: s.cover || "",
-      srcVideo: `series:${s.series_id}`,
-    }));
+    const cached = force ? null : await cacheGet(key);
+    const age = cached ? Date.now() - cached.at : Infinity;
 
-    if (!items.length && errors.length) throw errors[0];
-    return { items, account: cfg.account, expiresAt: cfg.expiresAt, mode: cfg.mode };
+    if (cached && age < MAX_STALE_MS) {
+      cached.items.forEach((c) => withLink(c, base, auth));
+      if (age >= FRESH_MS && onUpdate) {
+        refresh().then((items) => onUpdate(result(items, { fromCache: false }))).catch(() => { /* mantém o cache */ });
+      }
+      return result(cached.items, { fromCache: true, cachedAt: cached.at });
+    }
+
+    try {
+      return result(await refresh(), { fromCache: false });
+    } catch (e) {
+      // Sem rede / provedor fora do ar / limite de requisições: usa a cópia guardada, mesmo velha.
+      if (e.status !== 401) {
+        const old = await cacheGet(key);
+        if (old) {
+          old.items.forEach((c) => withLink(c, base, auth));
+          return result(old.items, { fromCache: true, cachedAt: old.at, offline: true });
+        }
+      }
+      throw e;
+    }
   });
 }
 

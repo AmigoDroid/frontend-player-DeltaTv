@@ -1077,6 +1077,7 @@ export default function App() {
     mac = deviceMac,
     saveMac = false,
     wantedListId = null,
+    forceRefresh = false,
   ) {
     const requestedMac = mac.trim();
     if (!requestedMac) {
@@ -1175,13 +1176,17 @@ export default function App() {
         }
       }
 
-      const data = await licensing.loadCatalog(requestedMac);
+      const data = await licensing.loadCatalog(requestedMac, {
+        force: forceRefresh,
+        // Cache antigo: a tela abre na hora com ele e, quando a atualização em segundo plano termina, troca a lista.
+        onUpdate: (fresh) => setItems(Array.isArray(fresh.items) ? fresh.items : []),
+      });
 
       const loadedItems = Array.isArray(data.items) ? data.items : [];
       setItems(loadedItems);
       setDeviceStatus({
         state: "active",
-        message: `Dispositivo ativado${loadedItems.length ? ` · ${loadedItems.length.toLocaleString("pt-BR")} itens disponíveis` : " · nenhum conteúdo disponível"}.`,
+        message: `Dispositivo ativado${loadedItems.length ? ` · ${loadedItems.length.toLocaleString("pt-BR")} itens disponíveis` : " · nenhum conteúdo disponível"}${data.offline ? " (catálogo salvo; sem conexão com o provedor)" : ""}.`,
       });
     } catch (e) {
       console.error("Erro ao consultar dispositivo:", e);
@@ -1982,7 +1987,7 @@ export default function App() {
                 </p>
                 <button
                   className="secondary"
-                  onClick={() => carregarDispositivo(deviceMac)}
+                  onClick={() => carregarDispositivo(deviceMac, false, null, true)}
                   disabled={loading}
                 >
                   Atualizar catálogo
