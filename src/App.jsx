@@ -14,14 +14,11 @@ import "./App.css";
 
 import * as licensing from "./licensing.js";
 
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  `${window.location.protocol}//${window.location.hostname}:3000`;
-
 const INITIAL_ITEMS_PER_CATEGORY = 30;
 const ITEMS_PER_CATEGORY_STEP = 30;
 const DEVICE_MAC_STORAGE_KEY = "iptv-player-device-mac";
 const DEVICE_MAC_MODE_STORAGE_KEY = "iptv-player-device-mac-mode";
+const listStorageKey = (mac) => `iptv-player-list:${mac}`;
 
 function createSimulatedMac() {
   const bytes = new Uint8Array(6);
@@ -956,6 +953,9 @@ export default function App() {
   const [providerUser, setProviderUser] = useState("");
   const [providerPass, setProviderPass] = useState("");
   const [items, setItems] = useState([]);
+  // Um MAC pode ter várias listas (uma por parceiro): `lists` vem de /client/lists.
+  const [lists, setLists] = useState([]);
+  const [currentListId, setCurrentListId] = useState(null);
 
   const [loading, setLoading] = useState(true);
 
@@ -1001,7 +1001,11 @@ export default function App() {
      CARREGAR PLAYLIST
   ========================================================= */
 
-  async function carregarDispositivo(mac = deviceMac, saveMac = false) {
+  async function carregarDispositivo(
+    mac = deviceMac,
+    saveMac = false,
+    wantedListId = null,
+  ) {
     const requestedMac = mac.trim();
     if (!requestedMac) {
       setDeviceStatus({
@@ -1047,6 +1051,58 @@ export default function App() {
         }
       }
 
+      // Um MAC pode ter VÁRIAS listas (parceiros). Descobre quais existem e escolhe qual abrir:
+      // a pedida pelo usuário > a última usada > a atual > a primeira liberada e configurada.
+      let info = null;
+      try {
+        info = await licensing.listsOf(requestedMac);
+      } catch (e) {
+        if (e.status === 401) throw e;
+        // Sem /lists (ou falha passageira): segue com a lista da sessão atual.
+      }
+      if (info) {
+        setLists(info.lists);
+        const usable = (l) => l.allowed && l.configured;
+        const byId = (id) => info.lists.find((l) => l.activationId === id);
+        let target = byId(wantedListId);
+        if (!target) {
+          target = byId(localStorage.getItem(listStorageKey(requestedMac)));
+          if (!target || !usable(target)) target = byId(info.currentActivationId);
+          if (!target || !usable(target))
+            target = info.lists.find(usable) || target;
+        }
+        if (!target) {
+          setCurrentListId(null);
+          setDeviceStatus({
+            state: "needs_activation",
+            message: "Nenhuma lista neste dispositivo. Informe o código de ativação.",
+          });
+          return;
+        }
+        if (target.activationId !== licensing.currentListId(requestedMac)) {
+          await licensing.useList(requestedMac, target.activationId);
+        }
+        setCurrentListId(target.activationId);
+        localStorage.setItem(listStorageKey(requestedMac), target.activationId);
+        if (!target.allowed) {
+          setDeviceStatus({
+            state: "blocked",
+            message: target.message || "Esta lista não está liberada.",
+          });
+          return;
+        }
+        if (!target.configured) {
+          setDeviceStatus({
+            state: "needs_activation",
+            message:
+              target.code === "PROVIDER_UNAVAILABLE"
+                ? target.message
+                : "Esta lista ainda não foi configurada. Informe o código de ativação.",
+          });
+          return;
+        }
+      }
+
       const data = await licensing.loadCatalog(requestedMac);
 
       const loadedItems = Array.isArray(data.items) ? data.items : [];
@@ -1066,8 +1122,11 @@ export default function App() {
       }
       setDeviceStatus({
         state: "error",
+        // Erros conhecidos do servidor/provedor trazem uma mensagem clara (ex.: "Serviço indisponível...").
         message:
-          "Não foi possível consultar o servidor. Verifique a conexão e tente novamente.",
+          e.code && e.message
+            ? e.message
+            : "Não foi possível consultar o servidor. Verifique a conexão e tente novamente.",
       });
     } finally {
       setLoading(false);
@@ -1079,13 +1138,14 @@ export default function App() {
     const requestedMac = macInput.trim();
     try {
       setLoading(true);
-      await licensing.activate(activationCode, requestedMac, {
+      const activated = await licensing.activate(activationCode, requestedMac, {
         username: providerUser,
         password: providerPass,
       });
       setActivationCode("");
       setProviderPass("");
-      await carregarDispositivo(requestedMac, true);
+      // Abre a lista recém-ativada (o MAC pode ter outras listas de outros parceiros).
+      await carregarDispositivo(requestedMac, true, activated.activationId);
     } catch (e) {
       setDeviceStatus({
         state: "blocked",
@@ -1756,6 +1816,30 @@ export default function App() {
               >
                 {deviceStatus.message}
               </div>
+              {lists.length > 1 && (
+                <div className="list-picker">
+                  <label htmlFor="list-select">Lista</label>
+                  <select
+                    id="list-select"
+                    value={currentListId || ""}
+                    disabled={loading}
+                    onChange={(event) =>
+                      carregarDispositivo(deviceMac, false, event.target.value)
+                    }
+                  >
+                    {lists.map((l, i) => (
+                      <option key={l.activationId} value={l.activationId}>
+                        {l.listName || `Lista ${i + 1}`}
+                        {!l.allowed
+                          ? " (bloqueada)"
+                          : !l.configured
+                            ? " (sem configuração)"
+                            : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </section>
 
             {deviceStatus.state !== "active" &&

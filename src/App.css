@@ -262,3 +262,8 @@ html,body{overflow-x:hidden}
 .qr-card{align-items:center;text-align:center}
 .qr-img{width:min(340px,100%);border-radius:16px;background:#fff;padding:0}
 .qr-dl{text-decoration:none;display:block;width:100%;text-align:center}
+
+.list-picker{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+.list-picker label{color:var(--muted);font-size:13px}
+.list-picker select{flex:1;min-width:200px;max-width:380px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:#0d1238;color:inherit;outline:none}
+.list-picker select:focus{border-color:var(--accent2)}
