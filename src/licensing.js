@@ -342,6 +342,11 @@ async function xtreamApi(conn, action, params = {}) {
           return Array.isArray(data) ? data : data || [];
         } catch { /* JSON truncado: tenta de novo */ }
       }
+    } else if (res.status === 429) {
+      // Limite de requisições do provedor/servidor: repetir rápido só piora. Espera (Retry-After ou crescente).
+      const wait = Math.min(Number(res.headers.get("retry-after")) * 1000 || attempt * 2000, 8000);
+      if (attempt < 3) await new Promise((r) => setTimeout(r, wait));
+      continue;
     } else if (conn.isMirror) {
       // A rota espelho responde { code, message } (ex.: ORIGIN_UNAVAILABLE, ORIGIN_ERROR, SESSION_REVOKED).
       const body = await res.json().catch(() => null);
@@ -442,31 +447,20 @@ export async function loadCatalog(mac) {
 
     const items = [];
     const errors = [];
-    // Como no app Roku: uma categoria por vez (?category_id=...), nunca a lista inteira de dezenas de MB.
-    // uma categoria por vez; cada resposta vira itens enxutos e é descartada.
-    const step = async (action, groups, build) => {
-      const ids = [...groups.keys()];
-      let next = 0;
-      let failed = 0;
-      let firstErr = null;
-      const worker = async () => {
-        while (next < ids.length) {
-          const id = ids[next++];
-          try {
-            const raw = asArray(await xtreamApi(conn, action, { category_id: id }));
-            for (const row of raw) items.push(build(row));
-          } catch (e) {
-            if (e.status === 401) throw e;
-            failed++;
-            firstErr = firstErr || e;
-          }
-        }
-      };
-      await Promise.all(Array.from({ length: Math.min(1, ids.length) }, worker));
-      if (ids.length && failed === ids.length) errors.push(firstErr);
+    // Uma requisição por TIPO (sem category_id): a lista inteira de canais, de filmes e de séries.
+    // Em sequência (uma conexão por vez) e cada resposta vira itens enxutos antes da próxima ser pedida,
+    // para a memória não acumular três listas grandes ao mesmo tempo.
+    const loadAll = async (action, groups, build) => {
+      try {
+        const raw = asArray(await xtreamApi(conn, action));
+        for (const row of raw) items.push(build(row));
+      } catch (e) {
+        if (e.status === 401) throw e;
+        errors.push(e);
+      }
     };
 
-    await step("get_live_streams", liveGroups, (c) => ({
+    await loadAll("get_live_streams", liveGroups, (c) => ({
       type: "canais",
       title: c.name,
       group: liveGroups.get(String(c.category_id)) || "Sem categoria",
@@ -474,7 +468,7 @@ export async function loadCatalog(mac) {
       // HLS primeiro, como o app Roku; o player cai para .ts sozinho se o HLS falhar.
       srcVideo: `${base}/live/${auth}/${c.stream_id}.m3u8`,
     }));
-    await step("get_vod_streams", vodGroups, (m) => ({
+    await loadAll("get_vod_streams", vodGroups, (m) => ({
       type: "filmes",
       title: m.title || m.name,
       group: vodGroups.get(String(m.category_id)) || "Sem categoria",
@@ -482,7 +476,7 @@ export async function loadCatalog(mac) {
       srcVideo: `${base}/movie/${auth}/${m.stream_id}.${m.container_extension || "mp4"}`,
     }));
     // Séries: só a lista; temporadas/episódios chegam sob demanda (loadSeriesEpisodes).
-    await step("get_series", serGroups, (s) => ({
+    await loadAll("get_series", serGroups, (s) => ({
       type: "series",
       seriesId: s.series_id,
       title: s.title || s.name,

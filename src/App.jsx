@@ -446,7 +446,16 @@ function VideoPlayer({
        * Chrome/Edge/Firefox (MSE): hls.js.
        */
       if (Hls.isSupported()) {
-        const hls = new Hls({ lowLatencyMode: false });
+        // Poucas conexões simultâneas: painéis IPTV costumam limitar por usuário e respondem 403 ao exceder.
+        const hls = new Hls({
+          lowLatencyMode: false,
+          startFragPrefetch: false,
+          maxBufferLength: 20,
+          maxMaxBufferLength: 30,
+          manifestLoadingMaxRetry: 1,
+          levelLoadingMaxRetry: 2,
+          fragLoadingMaxRetry: 3,
+        });
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           if (cancelled) return;
