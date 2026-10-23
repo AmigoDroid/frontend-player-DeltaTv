@@ -320,6 +320,7 @@ async function xtreamApi(conn, action, params = {}) {
   const url = `${trimSlash(conn.baseUrl)}/player_api.php?${qs}`;
   let unreachable = false;
   let lastStatus = 0;
+  let mirrorBody = null;
   // Painéis Xtream respondem 404/5xx ou uma página HTML de forma intermitente: até 3 tentativas, como o app Roku.
   for (let attempt = 1; attempt <= 3; attempt++) {
     let res;
@@ -341,13 +342,16 @@ async function xtreamApi(conn, action, params = {}) {
           return Array.isArray(data) ? data : data || [];
         } catch { /* JSON truncado: tenta de novo */ }
       }
-    } else if (conn.isMirror && (res.status === 401 || res.status === 503)) {
-      // A rota espelho responde 401 (sessão encerrada) / 503 (serviço indisponível) com { code, message }.
+    } else if (conn.isMirror) {
+      // A rota espelho responde { code, message } (ex.: ORIGIN_UNAVAILABLE, ORIGIN_ERROR, SESSION_REVOKED).
       const body = await res.json().catch(() => null);
-      throw Object.assign(new Error(body?.message || "O provedor recusou a consulta."), {
-        code: body?.code || "PROVIDER_ERROR",
-        status: res.status,
-      });
+      if (res.status === 401 || res.status === 503) {
+        throw Object.assign(new Error(body?.message || "O provedor recusou a consulta."), {
+          code: body?.code || "PROVIDER_ERROR",
+          status: res.status,
+        });
+      }
+      mirrorBody = body;
     }
     if (attempt < 3) await new Promise((r) => setTimeout(r, 400));
   }
@@ -359,6 +363,12 @@ async function xtreamApi(conn, action, params = {}) {
       ),
       { code: "PROVIDER_UNREACHABLE", status: 502 },
     );
+  }
+  if (mirrorBody?.code) {
+    throw Object.assign(new Error(`${mirrorBody.message || "Falha na origem."} (${mirrorBody.code}, HTTP ${lastStatus})`), {
+      code: mirrorBody.code,
+      status: 502,
+    });
   }
   throw Object.assign(
     new Error(
@@ -415,11 +425,16 @@ export async function loadCatalog(mac) {
     const auth = authOf(conn);
 
     // Categorias são pequenas: em paralelo. Se TODAS falharem, o erro sobe (e o plano B de withProvider entra).
-    const cats = await Promise.allSettled([
-      xtreamApi(conn, "get_live_categories"),
-      xtreamApi(conn, "get_vod_categories"),
-      xtreamApi(conn, "get_series_categories"),
-    ]);
+    // Um de cada vez, como o Roku: muitos painéis limitam as conexões simultâneas por usuário e respondem com erro.
+    const cats = [];
+    for (const action of ["get_live_categories", "get_vod_categories", "get_series_categories"]) {
+      try {
+        cats.push({ status: "fulfilled", value: await xtreamApi(conn, action) });
+      } catch (reason) {
+        if (reason?.status === 401) throw reason;
+        cats.push({ status: "rejected", reason });
+      }
+    }
     if (cats.every((r) => r.status === "rejected")) throw cats[0].reason;
     const authFail = cats.find((r) => r.status === "rejected" && r.reason?.status === 401);
     if (authFail) throw authFail.reason;
@@ -428,7 +443,7 @@ export async function loadCatalog(mac) {
     const items = [];
     const errors = [];
     // Como no app Roku: uma categoria por vez (?category_id=...), nunca a lista inteira de dezenas de MB.
-    // 4 categorias em paralelo; cada resposta vira itens enxutos e é descartada.
+    // uma categoria por vez; cada resposta vira itens enxutos e é descartada.
     const step = async (action, groups, build) => {
       const ids = [...groups.keys()];
       let next = 0;
@@ -447,7 +462,7 @@ export async function loadCatalog(mac) {
           }
         }
       };
-      await Promise.all(Array.from({ length: Math.min(4, ids.length) }, worker));
+      await Promise.all(Array.from({ length: Math.min(1, ids.length) }, worker));
       if (ids.length && failed === ids.length) errors.push(firstErr);
     };
 
