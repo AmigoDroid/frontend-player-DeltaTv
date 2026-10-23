@@ -471,7 +471,8 @@ export async function loadCatalog(mac) {
       title: c.name,
       group: liveGroups.get(String(c.category_id)) || "Sem categoria",
       srcImage: c.stream_icon || "",
-      srcVideo: `${base}/live/${auth}/${c.stream_id}.ts`,
+      // HLS primeiro, como o app Roku; o player cai para .ts sozinho se o HLS falhar.
+      srcVideo: `${base}/live/${auth}/${c.stream_id}.m3u8`,
     }));
     await step("get_vod_streams", vodGroups, (m) => ({
       type: "filmes",

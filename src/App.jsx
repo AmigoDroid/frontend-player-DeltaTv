@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import mpegts from "mpegts.js";
+import Hls from "hls.js";
 
 import "./App.css";
 
@@ -220,6 +221,18 @@ function VideoPlayer({
   const [error, setError] = useState("");
 
   /*
+   * Canal ao vivo: tenta HLS (.m3u8) primeiro, como o app Roku.
+   * Se o HLS falhar (ex.: painel responde 403 para o formato), repete
+   * automaticamente a mesma URL em MPEG-TS (.ts). Guarda para qual src
+   * o fallback já foi acionado, então trocar de canal volta ao HLS.
+   */
+  const [tsFallbackFor, setTsFallbackFor] = useState("");
+  const effectiveSrc =
+    type === "canais" && src && tsFallbackFor === src
+      ? src.replace(/\.m3u8(\?|#|$)/i, ".ts$1")
+      : src;
+
+  /*
    * Mantém a referência do callback atualizada
    * sem precisar recriar o player toda vez.
    */
@@ -243,18 +256,18 @@ function VideoPlayer({
    * React
    */
   const proxyUrl = useMemo(() => {
-    if (!src) return "";
+    if (!effectiveSrc) return "";
 
     // `src` já é a URL autorizada do gateway de licenciamento (token curto incluído).
-    return src;
-  }, [src]);
+    return effectiveSrc;
+  }, [effectiveSrc]);
 
   /*
    * Descobre o tipo do player.
    */
   const playerType = useMemo(() => {
-    return detectPlayerType(src, type);
-  }, [src, type]);
+    return detectPlayerType(effectiveSrc, type);
+  }, [effectiveSrc, type]);
 
   /*
    * Função central de erro.
@@ -270,6 +283,22 @@ function VideoPlayer({
 
     errorCallbackRef.current?.(finalMessage);
   }, []);
+
+  /*
+   * Erro do HLS em canal ao vivo: tenta MPEG-TS uma vez antes de desistir.
+   */
+  const handleHlsFailure = useCallback(
+    (message) => {
+      if (type === "canais" && src && tsFallbackFor !== src) {
+        console.warn("HLS falhou; tentando MPEG-TS (.ts):", message);
+        setError("");
+        setTsFallbackFor(src);
+        return;
+      }
+      handleError(message);
+    },
+    [type, src, tsFallbackFor, handleError],
+  );
 
   /*
    * Quando o conteúdo muda:
@@ -414,7 +443,47 @@ function VideoPlayer({
       console.log("SOURCE:", proxyUrl);
 
       /*
-       * Alguns navegadores possuem suporte nativo.
+       * Chrome/Edge/Firefox (MSE): hls.js.
+       */
+      if (Hls.isSupported()) {
+        const hls = new Hls({ lowLatencyMode: false });
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          if (cancelled) return;
+
+          setLoading(false);
+
+          video.play().catch(() => {
+            console.log("Autoplay HLS bloqueado pelo navegador.");
+          });
+        });
+
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (cancelled || !data?.fatal) return;
+
+          console.error("HLS ERROR:", data.type, data.details, data.response);
+
+          handleHlsFailure(
+            `Não foi possível reproduzir o HLS (${data.details || "erro"}).`,
+          );
+        });
+
+        hls.loadSource(proxyUrl);
+        hls.attachMedia(video);
+
+        return () => {
+          cancelled = true;
+
+          try {
+            hls.destroy();
+          } catch {
+            // Ignora.
+          }
+        };
+      }
+
+      /*
+       * Safari/iOS: HLS nativo.
        */
       if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = proxyUrl;
@@ -432,7 +501,7 @@ function VideoPlayer({
         const handleVideoError = () => {
           if (cancelled) return;
 
-          handleError("Não foi possível reproduzir o HLS.");
+          handleHlsFailure("Não foi possível reproduzir o HLS.");
         };
 
         video.addEventListener("loadedmetadata", handleLoadedMetadata);
@@ -458,13 +527,7 @@ function VideoPlayer({
         };
       }
 
-      /*
-       * Chrome/Firefox/Edge:
-       *
-       * Para HLS nesses navegadores,
-       * será necessário instalar hls.js.
-       */
-      handleError("Este navegador não possui suporte nativo a HLS.");
+      handleError("Este navegador não suporta reprodução HLS.");
 
       return () => {
         cancelled = true;
@@ -635,7 +698,7 @@ function VideoPlayer({
     return () => {
       cancelled = true;
     };
-  }, [src, type, proxyUrl, playerType, handleError]);
+  }, [src, type, proxyUrl, playerType, handleError, handleHlsFailure]);
 
   /*
    * ==================================================
