@@ -9,18 +9,25 @@
 const ENV_URL = String(import.meta.env.VITE_API_URL || "").trim().replace(/\/+$/, "");
 export const API_URL = ENV_URL || (import.meta.env.DEV ? `${window.location.protocol}//${window.location.hostname}:3000` : "");
 const BASE = `${API_URL}/api/v1/client`;
-const KEY_INSTALL = "iptv-player-installation-id";
+const KEY_INSTALL = "iptv-player-installation-id"; // id aleatório (web-<uuid>) da versão anterior
+const KEY_IID = "iptv-player-iid:"; // + MAC: installationId usado por este navegador para aquele MAC
 const KEY_SESSION = "iptv-player-session";
 const LEGACY = "_"; // sessão salva pela versão anterior (sem activationId); é renomeada ao consultar /lists
 
-export function getInstallationId() {
-  let id = localStorage.getItem(KEY_INSTALL);
-  if (!id) {
-    id = `web-${typeof crypto !== "undefined" && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`}`;
-    localStorage.setItem(KEY_INSTALL, id);
-  }
+const macHex = (mac) => String(mac || "").replace(/[^0-9a-fA-F]/g, "").toUpperCase();
+
+// installationId deste navegador para o MAC: "webtv-<MAC sem separadores, maiúsculo>", formato que o servidor aceita
+// em /register e /register/status (prefixos roku, rokutv, androidtv, samsungtv, lgtv, webtv) e que ele compara pelo MAC.
+// Fica gravado por MAC. Navegador que já tinha sessão da versão anterior continua com o id antigo (web-<uuid>), porque
+// a ativação dele no servidor está presa a esse id; só instalações novas usam webtv-<MAC>.
+export function getInstallationId(mac) {
+  const key = `${KEY_IID}${macHex(mac)}`;
+  const saved = localStorage.getItem(key);
+  if (saved) return saved;
+  const legacy = localStorage.getItem(KEY_INSTALL);
+  const old = readStore();
+  const id = legacy && old && macHex(old.mac) === macHex(mac) ? legacy : `webtv-${macHex(mac)}`;
+  localStorage.setItem(key, id);
   return id;
 }
 
@@ -133,9 +140,10 @@ export const isLicenseCode = (code) => code.replace(/[^A-Za-z0-9]/g, "").length 
 
 export async function activate(code, mac, { username = "", password = "" } = {}) {
   const license = isLicenseCode(code);
+  const installationId = getInstallationId(mac);
   const body = license
-    ? { code: code.trim(), mac, installationId: getInstallationId() }
-    : { code: code.trim(), username, password, mac, installationId: getInstallationId() };
+    ? { code: code.trim(), mac, installationId }
+    : { code: code.trim(), username, password, mac, installationId };
   const data = await call(`/activate/${license ? "license" : "partner"}`, { method: "POST", body });
   // Ativar outro parceiro no mesmo MAC cria uma NOVA lista; as sessões das demais listas são mantidas.
   putSession(mac, data.activationId, data.tokens);
@@ -149,11 +157,10 @@ export async function activate(code, mac, { username = "", password = "" } = {})
 // App.jsx pede o código de ativação.
 const CONFIGURED = new Set(["configured_partner", "configured_playlist", "configured"]);
 
-export async function claimLegacy(mac) {
-  const data = await call("/register", { method: "POST", body: { mac, installationId: getInstallationId() } });
+// Guarda as sessões que o servidor liberou (uma por lista em data.activations[].tokens e/ou a principal em data.tokens).
+function storeGranted(mac, data) {
   const status = String(data.status || data.configurationStatus || "");
   let stored = 0;
-
   // Um MAC pode ter vários parceiros: o servidor pode devolver uma sessão por lista em data.activations[].tokens.
   const acts = Array.isArray(data.activations) ? data.activations : [];
   for (const a of acts) {
@@ -168,11 +175,32 @@ export async function claimLegacy(mac) {
     putSession(mac, id, data.tokens, { makeCurrent: stored === 0 });
     stored++;
   }
+  return stored;
+}
+
+export async function claimLegacy(mac) {
+  const installationId = getInstallationId(mac);
+  let data = await call("/register", { method: "POST", body: { mac, installationId } });
+  let stored = storeGranted(mac, data);
+
+  // O /register só registra o aparelho e devolve o token de pareamento: a sessão sai no /register/status (como no app
+  // Roku e no Android). Se o MAC já tem lista vinculada, a resposta já traz as sessões; se não, segue sem sessão.
+  const registrationToken = data.pairing?.registrationToken;
+  if (!stored && registrationToken) {
+    try {
+      const st = await call("/register/status", { method: "POST", body: { mac, installationId, registrationToken } });
+      data = st;
+      stored = storeGranted(mac, st);
+    } catch (e) {
+      if (e.status !== 403 && e.status !== 409) throw e; // token inválido/já usado: segue sem sessão
+    }
+  }
   if (stored) {
     xtreamCache = null;
     return data;
   }
 
+  const status = String(data.status || data.configurationStatus || "");
   if (status === "expired" || status === "disabled" || status === "deactivated") {
     throw Object.assign(new Error(data.message || "Este dispositivo está bloqueado ou expirado."), {
       code: status.toUpperCase(),
@@ -193,7 +221,7 @@ async function accessToken(mac, activationId, force = false) {
   try {
     const data = await call("/session/refresh", {
       method: "POST",
-      body: { refreshToken: cur.refreshToken, installationId: getInstallationId() },
+      body: { refreshToken: cur.refreshToken, installationId: getInstallationId(mac) },
     });
     putSession(mac, id, data.tokens, { makeCurrent: false });
     return data.tokens.accessToken;
@@ -264,7 +292,7 @@ export async function useList(mac, activationId) {
       const data = await authed(mac, `/lists/${activationId}/session`, {
         activationId: from,
         method: "POST",
-        body: { installationId: getInstallationId() },
+        body: { installationId: getInstallationId(mac) },
       });
       putSession(mac, activationId, data.tokens);
       xtreamCache = null;
@@ -613,8 +641,8 @@ export async function checkStatus(mac) {
 }
 
 // Cadastra um dispositivo EXTERNO (ex.: Roku) por MAC + código de parceria + usuário/senha do provedor.
-// Não guarda sessão neste navegador. O installationId segue o padrão do Roku ("roku-" + MAC sem separadores, maiúsculo),
-// então a TV reconhece o cadastro quando abrir o app. Se o MAC já tem outro parceiro, vira uma lista a mais.
+// Não guarda sessão neste navegador. O installationId é "roku-" + MAC sem separadores (maiúsculo); o servidor compara instalações pelo MAC e
+// ignora o prefixo, então qualquer TV (Roku, Android, Samsung, LG, Web) reconhece o cadastro quando abrir o app. Se o MAC já tem outro parceiro, vira uma lista a mais.
 export const normalizeMacInput = (raw) => {
   const hex = String(raw || "").replace(/[^0-9a-fA-F]/g, "").toUpperCase();
   return hex.length === 12 ? hex : null;
