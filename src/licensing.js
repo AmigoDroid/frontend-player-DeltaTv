@@ -664,3 +664,14 @@ export async function registerExternalDevice({ mac, code, username, password }) 
   // Descarta os tokens de propósito: o navegador não vira esse dispositivo.
   return { mac: hex.match(/.{2}/g).join(":"), expiresAt: data.expiresAt, reused: !!data.reused, kind: data.kind };
 }
+
+// Cadastra uma lista pelo LINK M3U completo (sem baixar a lista): o servidor extrai servidor, usuário e senha e a TV mostra o nome informado.
+// Sem licença ativa no MAC o cadastro é aceito, mas só passa a valer quando a licença for ativada (resposta `licensed: false`).
+export async function addPlaylistByUrl({ mac, name, url }) {
+  const hex = normalizeMacInput(mac);
+  if (!hex) throw Object.assign(new Error("MAC inválido. Use 12 caracteres hexadecimais (ex.: D6:41:F4:FF:0A:98)."), { code: "INVALID_MAC", status: 400 });
+  return call("/playlist/by-url", {
+    method: "POST",
+    body: { mac: hex.match(/.{2}/g).join(":"), name: String(name).trim(), url: String(url).trim() },
+  });
+}
