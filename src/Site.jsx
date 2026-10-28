@@ -20,7 +20,7 @@ export function Header({ home = false }) {
         <a href="/" className="dl-header__brand" aria-label="Delta TV, página inicial"><Logo /></a>
         <nav className="dl-nav" aria-label="Principal">
           <a href={to("#como-funciona")}>Como funciona</a>
-          <a href={to("#licenca")}>Licença</a>
+          <a href="/ativar">Ativar licença</a>
           <a href={to("#aparelhos")}>Aparelhos</a>
           <a href="/player">Player web</a>
         </nav>

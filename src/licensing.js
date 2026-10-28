@@ -675,3 +675,16 @@ export async function addPlaylistByUrl({ mac, name, url }) {
     body: { mac: hex.match(/.{2}/g).join(":"), name: String(name).trim(), url: String(url).trim() },
   });
 }
+
+/* ---------------------------------------------------------------------------
+ * Compra da licença anual pelo site (Pix). Público: sem sessão da TV. O preço vem do servidor.
+ * ------------------------------------------------------------------------- */
+export const getLicenseOffer = () => call("/pix/license/config");
+
+export async function createLicensePix({ mac, email }) {
+  const hex = normalizeMacInput(mac);
+  if (!hex) throw Object.assign(new Error("MAC inválido. Use 12 caracteres hexadecimais (ex.: D6:41:F4:FF:0A:98)."), { code: "INVALID_MAC", status: 400 });
+  return call("/pix/license", { method: "POST", body: { mac: hex.match(/.{2}/g).join(":"), email: String(email).trim() } });
+}
+
+export const getLicensePix = (id) => call(`/pix/license/${encodeURIComponent(id)}`);

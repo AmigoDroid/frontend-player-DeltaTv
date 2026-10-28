@@ -96,6 +96,7 @@ export default function Home() {
                 <p>A lista fica guardada no aparelho e começa a funcionar quando a licença for ativada. Não precisa enviar de novo.</p>
               </div>
             </div>
+            <p className="dl-cta"><a className="dl-btn dl-btn--primary" href="/ativar">Comprar a licença anual (Pix)</a></p>
           </div>
         </section>
 

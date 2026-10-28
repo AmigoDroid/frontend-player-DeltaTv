@@ -2,6 +2,7 @@ import React, { lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import Home from './Home.jsx';
 import UploadPlaylist from './UploadPlaylist.jsx';
+import Activate from './Activate.jsx';
 import QrCodePage from './QrCode.jsx';
 import './App.css';
 import './site.css';
@@ -19,6 +20,7 @@ if (path === '/player') {
     </Suspense>
   );
 } else if (path === '/upload/playlist') page = <UploadPlaylist />;
+else if (path === '/ativar') page = <Activate />;
 else if (path.startsWith('/get_qrcode/')) {
   let mac = path.slice('/get_qrcode/'.length);
   try { mac = decodeURIComponent(mac); } catch { /* mantém o valor cru */ }
