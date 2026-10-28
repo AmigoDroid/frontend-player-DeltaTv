@@ -223,3 +223,9 @@
 .dl-checks li { position: relative; padding-left: 28px; line-height: 1.5; color: #e6e8ff; }
 .dl-checks li::before { content: "✓"; position: absolute; left: 0; color: var(--dl-ok); font-weight: 700; }
 @media (max-width: 820px) { .dl-pix__qr { width: 200px; height: 200px; } }
+
+/* Aceite: o DeltaTV é só um player e não fornece conteúdo */
+.dl-consent { display: flex; align-items: flex-start; gap: 12px; padding: 14px; border: 1px solid #3a4090; border-radius: 12px; background: rgba(109, 107, 255, .10); cursor: pointer; line-height: 1.5; font-size: 14px; color: #e6e8ff; }
+.dl-consent input { flex: none; width: 22px; height: 22px; margin: 1px 0 0; accent-color: var(--dl-accent); cursor: pointer; }
+.dl-consent input:focus-visible { outline: 3px solid rgba(109, 107, 255, .5); outline-offset: 2px; }
+.dl-consent strong { color: #fff; }

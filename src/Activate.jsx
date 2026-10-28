@@ -67,6 +67,7 @@ export default function Activate() {
   const [offerError, setOfferError] = useState("");
   const [mac, setMac] = useState(() => formatMac(new URLSearchParams(window.location.search).get("mac") || ""));
   const [email, setEmail] = useState("");
+  const [accepted, setAccepted] = useState(false); // ciência de que o DeltaTV é só um player
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [charge, setCharge] = useState(null);
@@ -98,7 +99,7 @@ export default function Activate() {
   }, [charge?.id, charge?.status]);
 
   const macOk = !!normalizeMacInput(mac);
-  const ready = macOk && looksLikeEmail(email) && offer?.enabled;
+  const ready = macOk && looksLikeEmail(email) && accepted && offer?.enabled;
   const price = useMemo(() => (offer?.priceCents ? money(offer.priceCents) : ""), [offer]);
 
   async function submit(e) {
@@ -119,6 +120,7 @@ export default function Activate() {
 
   function again() {
     sessionStorage.removeItem(KEY);
+    setAccepted(false);
     setCharge(null);
     setError("");
   }
@@ -178,6 +180,14 @@ export default function Activate() {
           />
           <small>Usado só para o recibo do pagamento e para o suporte.</small>
         </label>
+        <label className="dl-consent">
+          <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
+          <span>
+            <strong>Estou ciente de que o DeltaTV é apenas um player (aplicativo reprodutor).</strong>{" "}
+            Ele <b>não fornece, não vende e não inclui nenhum conteúdo</b> (canais, filmes ou séries). A licença anual libera apenas o uso do aplicativo,
+            e eu preciso ter a minha própria lista, de uma fonte legítima.
+          </span>
+        </label>
         <button type="submit" className="dl-btn dl-btn--primary" disabled={!ready || busy}>
           {busy ? "Gerando Pix…" : price ? `Pagar ${price} com Pix` : "Pagar com Pix"}
         </button>
@@ -217,7 +227,7 @@ export default function Activate() {
               <li>Se você já enviou a lista pelo site, ela passa a funcionar na hora.</li>
               <li>Vale para 1 aparelho. Você pode renovar quando vencer.</li>
             </ul>
-            <p className="dl-muted">O DeltaTV é um aplicativo player e não fornece conteúdo.</p>
+            <p className="dl-muted"><b>O DeltaTV é apenas um player e não fornece nenhum conteúdo.</b> Você usa a sua própria lista.</p>
           </aside>
         </div>
       </main>
