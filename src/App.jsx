@@ -1669,7 +1669,14 @@ export default function App() {
         {/* ================= PLAYER ================= */}
         {selectedItem &&
           (() => {
-            const docked = !playerExpanded && section === "canais" && !!slot;
+            // Encaixa na prévia só enquanto ela está visível na tela; se rolar para fora (celular), vira mini-player flutuante
+            const slotVisible =
+              !!slot &&
+              slot.height > 0 &&
+              slot.top + slot.height > 0 &&
+              slot.top < window.innerHeight;
+            const docked =
+              !playerExpanded && section === "canais" && slotVisible;
             return (
               <section
                 className={`player ${playerExpanded ? "expanded" : docked ? "docked" : "pip"}`}
