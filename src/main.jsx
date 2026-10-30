@@ -7,8 +7,12 @@ import QrCodePage from './QrCode.jsx';
 import './App.css';
 import './site.css';
 
-// O player (hls.js + mpegts.js) é pesado: só é baixado em /player.
-const Player = lazy(() => import('./App.jsx'));
+// /player = Player Web separado (login pelo código do revendedor). O player antigo (MAC simulado + código de parceria) só
+// existe em desenvolvimento/laboratório: VITE_PLAYER_LEGACY=true o liga em /player/legado. Em produção fica desligado,
+// senão qualquer pessoa com código de parceria + usuário/senha contornaria o licenciamento do Player Web.
+const PlayerWeb = lazy(() => import('./PlayerWeb.jsx'));
+const LegacyPlayer = lazy(() => import('./App.jsx'));
+const LEGACY = import.meta.env.VITE_PLAYER_LEGACY === 'true';
 
 // Roteamento mínimo por caminho (sem dependências extras). Servidor estático com fallback para index.html (serve -s).
 const path = window.location.pathname.replace(/\/+$/, '') || '/';
@@ -16,7 +20,13 @@ let page = <Home />;
 if (path === '/player') {
   page = (
     <Suspense fallback={<div className="dl-boot" role="status">Carregando o player…</div>}>
-      <Player />
+      <PlayerWeb />
+    </Suspense>
+  );
+} else if (LEGACY && path === '/player/legado') {
+  page = (
+    <Suspense fallback={<div className="dl-boot" role="status">Carregando o player…</div>}>
+      <LegacyPlayer />
     </Suspense>
   );
 } else if (path === '/upload/playlist') page = <UploadPlaylist />;

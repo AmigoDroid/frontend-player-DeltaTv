@@ -135,6 +135,47 @@ export const clearSession = () => {
   cacheClearAll(); // sair/limpar sessão também apaga o catálogo guardado neste navegador
 };
 
+/* ---------------------------------------------------------------------------
+ * Player Web separado: login pelo CÓDIGO do revendedor (2 letras + 6 dígitos, ex.: AB123456).
+ * O servidor devolve um MAC virtual e a sessão da ativação; daí em diante vale o mesmo fluxo das TVs (catálogo, status,
+ * renovação de sessão). Só o que identifica o acesso fica guardado aqui: o código em si NÃO é guardado no navegador.
+ * ------------------------------------------------------------------------- */
+const KEY_WEB = "iptv-player-web-access";
+export const WEB_CODE_RE = /^[A-Z]{2}[0-9]{6}$/;
+export const normalizeWebCode = (raw) => {
+  const c = String(raw || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return WEB_CODE_RE.test(c) ? c : "";
+};
+
+export function getWebAccess() {
+  try {
+    const w = JSON.parse(localStorage.getItem(KEY_WEB));
+    return w && w.mac && getSession(w.mac) ? w : null; // sem sessão guardada = precisa entrar de novo
+  } catch {
+    return null;
+  }
+}
+
+export async function webLogin(rawCode) {
+  const code = normalizeWebCode(rawCode);
+  if (!code) {
+    throw Object.assign(new Error("Código inválido. Use 2 letras e 6 números (ex.: AB123456)."), { code: "INVALID_WEB_CODE", status: 400 });
+  }
+  const data = await call("/web/login", { method: "POST", body: { code } });
+  clearSession(); // outro acesso neste navegador: nada da sessão/catálogo anterior fica
+  putSession(data.mac, data.activationId, data.tokens);
+  localStorage.setItem(KEY_IID + macHex(data.mac), data.installationId);
+  const access = { mac: data.mac, activationId: data.activationId, listName: data.listName || null, expiresAt: data.expiresAt || null };
+  localStorage.setItem(KEY_WEB, JSON.stringify(access));
+  xtreamCache = null;
+  return access;
+}
+
+export function webLogout() {
+  localStorage.removeItem(KEY_WEB);
+  clearSession();
+}
+
 // Código de licença individual é longo (LIC-XXXXX-…); código de parceria é curto (4–12 letras/números).
 export const isLicenseCode = (code) => code.replace(/[^A-Za-z0-9]/g, "").length > 12;
 

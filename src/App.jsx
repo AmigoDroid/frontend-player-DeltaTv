@@ -1011,11 +1011,15 @@ const NAV = [
    APP
 ========================================================= */
 
-export default function App() {
-  const [deviceMac, setDeviceMac] = useState(getStoredDeviceMac);
+/*
+ * `webAccess` ({ mac, listName, expiresAt }) = Player Web separado: o acesso vem do código do revendedor (PlayerWeb.jsx).
+ * Nesse modo não há MAC editável nem código de ativação: só o catálogo e o botão "Sair".
+ */
+export default function App({ webAccess = null, onWebLogout = null } = {}) {
+  const [deviceMac, setDeviceMac] = useState(() => webAccess?.mac ?? getStoredDeviceMac());
   const [macInput, setMacInput] = useState(deviceMac);
   const [macMode, setMacMode] = useState(
-    () => localStorage.getItem(DEVICE_MAC_MODE_STORAGE_KEY) || "simulated",
+    () => (webAccess ? "web" : localStorage.getItem(DEVICE_MAC_MODE_STORAGE_KEY) || "simulated"),
   );
   const [deviceStatus, setDeviceStatus] = useState({
     state: "checking",
@@ -1088,7 +1092,7 @@ export default function App() {
       return;
     }
 
-    if (saveMac) {
+    if (saveMac && !webAccess) {
       localStorage.setItem(DEVICE_MAC_STORAGE_KEY, requestedMac);
       localStorage.setItem(DEVICE_MAC_MODE_STORAGE_KEY, "provided");
       setDeviceMac(requestedMac);
@@ -1109,6 +1113,10 @@ export default function App() {
         message: "Verificando o dispositivo...",
       });
 
+      if (webAccess && !licensing.getSession(requestedMac)) {
+        setDeviceStatus({ state: "needs_activation", message: "Sessão encerrada. Entre novamente com o seu código." });
+        return;
+      }
       if (!licensing.getSession(requestedMac)) {
         try {
           await licensing.claimLegacy(requestedMac); // dispositivos migrados do sistema antigo
@@ -1632,8 +1640,8 @@ export default function App() {
         </nav>
 
         <div className="sidebar-foot">
-          <small>MAC VIRTUAL</small>
-          <strong>{deviceMac.toUpperCase()}</strong>
+          <small>{webAccess ? "ACESSO WEB" : "MAC VIRTUAL"}</small>
+          <strong>{webAccess ? webAccess.listName || "Minha lista" : deviceMac.toUpperCase()}</strong>
           <em>Delta TV v1.1 • Não vendemos conteúdo</em>
         </div>
       </aside>
@@ -1867,6 +1875,24 @@ export default function App() {
               <h1>{isActive ? "Configurações" : "Ativar dispositivo"}</h1>
             </div>
 
+            {webAccess && (
+              <section className="panel">
+                <h3>Acesso web</h3>
+                <div className={`device-status ${deviceStatus.state}`} role="status" aria-live="polite">
+                  {deviceStatus.message}
+                </div>
+                {webAccess.expiresAt && (
+                  <p className="device-note">
+                    Licença válida até {new Date(webAccess.expiresAt).toLocaleDateString("pt-BR")}.
+                  </p>
+                )}
+                <button className="secondary" onClick={() => onWebLogout?.()}>
+                  {deviceStatus.state === "active" ? "Sair deste navegador" : "Entrar com outro código"}
+                </button>
+              </section>
+            )}
+
+            {!webAccess && (
             <section className="panel">
               <h3>Dispositivo</h3>
               <form
@@ -1925,8 +1951,10 @@ export default function App() {
                 </div>
               )}
             </section>
+            )}
 
-            {deviceStatus.state !== "active" &&
+            {!webAccess &&
+              deviceStatus.state !== "active" &&
               deviceStatus.state !== "checking" && (
                 <section className="panel">
                   <h3>Código de ativação</h3>
